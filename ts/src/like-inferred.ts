@@ -120,10 +120,12 @@ export interface Pattern {
 }
 
 export interface Behavior {
-  awaits?: object & {};
-  yields?: Schema;
-  takes?: Array<Schema>;
-  returns?: Schema;
+  ts?: {
+    awaits?: object & {};
+    yields?: Schema;
+    takes?: Array<Schema>;
+    returns?: Schema;
+  };
 }
 
 export interface Declaration {

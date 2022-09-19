@@ -459,7 +459,6 @@
         "fields": {
           "ts": {
             "id": 0,
-            "mutex": {},
             "type": {
               "_": "Tagged with a language-specifying file-extension.",
               "object": {
