@@ -1,7 +1,6 @@
 import stdlib from "./like.json" assert { type: "json" };
 
-import {
-  And,
+import type {
   Behavior,
   Declaration,
   Field,
@@ -11,9 +10,23 @@ import {
   Registrations,
   Registry,
   Schema,
-} from "./like-inferred.ts";
+} from "./like-inferred.d.ts";
 
-export * from "./like-inferred.ts";
+// TODO: beg for export type * from ""; https://github.com/microsoft/TypeScript/issues/37238
+export type {
+  KeysFrom,
+  Registrations,
+  Registries,
+  Registry,
+  Schema,
+  And,
+  Or,
+  Pattern,
+  Behavior,
+  Declaration,
+  Field,
+  Inferred,
+} from "./like-inferred.d.ts";
 
 const isDataView = function (this: () => any, val: any): val is DataView {
   return this.call(val) === "[object DataView]";
