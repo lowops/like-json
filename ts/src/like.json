@@ -1,0 +1,590 @@
+{
+  "_": {
+    "id": 0,
+    "type": {
+      "_": "This is conventionally the default Registry key -- also can be used as Pattern documentation key.",
+      "like": { "valid": { "Registry": {} } }
+    }
+  },
+  "Registry": {
+    "id": 1,
+    "type": {
+      "_": "'Registry' is a keyed collection of Schemas.",
+      "object": {
+        "values": {
+          "type": {
+            "_": "",
+            "object": {
+              "fields": {
+                "id": {
+                  "id": 0,
+                  "type": {
+                    "_": "",
+                    "float": { "safe": { "integer": {} } }
+                  }
+                },
+                "type": {
+                  "id": 1,
+                  "type": {
+                    "_": "",
+                    "like": { "valid": { "Schema": {} } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "Schema": {
+    "id": 2,
+    "type": {
+      "_": "'Schema' is a union.",
+      "like": { "valid": { "And": {}, "Or": {}, "Pattern": {} } }
+    }
+  },
+  "Or": {
+    "id": 3,
+    "type": {
+      "_": "'Or' is a heavyweight union of Patterns and Intersections -- indexed by rename-stable reconciliation decimal.",
+      "object": {
+        "fields": {
+          "_": {
+            "id": 0,
+            "type": { "_": "", "object": {} }
+          },
+          "": {
+            "id": 1,
+            "optional": {},
+            "type": { "_": "Placeholder<never> for metadata/documentation." }
+          }
+        },
+        "keys": { "numeric": {} },
+        "values": {
+          "type": {
+            "_": "",
+            "like": { "schema": {} }
+          }
+        }
+      }
+    }
+  },
+  "And": {
+    "id": 4,
+    "type": {
+      "_": "'And' is an intersection of Patterns -- indexed by rename-stable reconciliation decimal.",
+      "object": {
+        "fields": {
+          "_": {
+            "id": 0,
+            "type": { "_": "", "array": {} }
+          },
+          "": {
+            "id": 1,
+            "optional": {},
+            "type": { "_": "Placeholder<never> for metadata/documentation." }
+          }
+        },
+        "keys": { "numeric": {} },
+        "values": {
+          "type": {
+            "_": "",
+            "like": { "schema": {} }
+          }
+        }
+      }
+    }
+  },
+  "Pattern": {
+    "id": 5,
+    "type": {
+      "_": "'Pattern' is a lightweight union that branches on primitive type",
+      "object": {
+        "fields": {
+          "_": {
+            "id": 0,
+            "type": {
+              "_": "All 'Pattern' specifications have an '' (empyty string) key -- use it for documentation (like this).",
+              "string": {}
+            }
+          },
+          "like": {
+            "id": 1,
+            "optional": {},
+            "type": {
+              "_": "'like' exposes a union of hooks for builtin types.",
+              "object": {
+                "fields": {
+                  "valid": {
+                    "id": 0,
+                    "optional": {},
+                    "type": {
+                      "_": "'valid' is a union of aliases (i.e. this object's keys) to registred Schemas.",
+                      "object": {
+                        "values": {
+                          "type": { "_": "", "object": {} }
+                        }
+                      }
+                    }
+                  },
+                  "schema": {
+                    "id": 1,
+                    "optional": {},
+                    "type": {
+                      "_": "'schema' is shorthand for the builtin Schema type -- esp. useful in other Registries.",
+                      "object": {}
+                    }
+                  },
+                  "registry": {
+                    "id": 2,
+                    "optional": {},
+                    "type": {
+                      "_": "'registry' is shorthand for the builtin Registry type -- esp. useful in other Registries.",
+                      "object": {}
+                    }
+                  },
+                  "behavior": {
+                    "id": 3,
+                    "optional": {},
+                    "type": {
+                      "_": "'behavior' is shorthand for the builtin Behavior type -- esp. useful in other Registries.",
+                      "object": {}
+                    }
+                  },
+                  "pattern": {
+                    "id": 4,
+                    "optional": {},
+                    "type": {
+                      "_": "'pattern' is shorthand for the builtin Pattern type -- esp. useful in other Registries.",
+                      "object": {}
+                    }
+                  },
+                  "field": {
+                    "id": 5,
+                    "optional": {},
+                    "type": {
+                      "_": "'field' is shorthand for the builtin Field type -- esp. useful in other Registries.",
+                      "object": {}
+                    }
+                  },
+                  "declaration": {
+                    "id": 6,
+                    "optional": {},
+                    "type": {
+                      "_": "'declaration' is shorthand for the builtin Declaration type -- esp. useful in other Registries.",
+                      "object": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "object": {
+            "id": 2,
+            "optional": {},
+            "type": {
+              "_": "'object' is an associative collection type.",
+              "object": {
+                "fields": {
+                  "fields": {
+                    "id": 0,
+                    "optional": {},
+                    "type": {
+                      "_": "Presence of 'fields includes <{[P in keyof fields]: fields[P] }>.",
+                      "object": {
+                        "values": {
+                          "type": {
+                            "_": "",
+                            "like": { "valid": { "Field": {} } }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "values": {
+                    "id": 1,
+                    "optional": {},
+                    "type": {
+                      "_": "Presence of 'values' includes <{ [id:number]: values } | { [key:string]: values }>.",
+                      "like": { "valid": { "Declaration": {} } }
+                    }
+                  },
+                  "keys": {
+                    "id": 1,
+                    "optional": {},
+                    "type": {
+                      "_": "'keys' of the object can optionally be limited to strings that can be parsed as numbers.",
+                      "object": {
+                        "fields": {
+                          "numeric": {
+                            "id": 0,
+                            "optional": {},
+                            "type": {
+                              "_": "Presence of 'numeric' means <{ [id:number]: values }>, not <{ [key:string]: values }>.",
+                              "object": {}
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "array": {
+            "id": 3,
+            "optional": {},
+            "type": {
+              "_": "'array' is a sequential collection type.",
+              "object": {
+                "fields": {
+                  "items": {
+                    "id": 0,
+                    "optional": {},
+                    "type": {
+                      "_": "Presence of 'items' indicates <Array<items>> if no 'prefix is specified'.",
+                      "like": { "valid": { "Declaration": {} } }
+                    }
+                  },
+                  "prefix": {
+                    "id": 1,
+                    "optional": {},
+                    "type": {
+                      "_": "Presence of 'prefix' indicates <[...NumericObjectToTuple<prefix>, ...Array<items | never>]>.",
+                      "object": {
+                        "keys": { "numeric": {} },
+                        "values": {
+                          "type": {
+                            "_": "",
+                            "like": { "valid": { "Declaration": {} } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "data": {
+            "id": 4,
+            "optional": {},
+            "type": {
+              "_": "'data' is a DataView over an ArrayBuffer.",
+              "object": {}
+            }
+          },
+          "null": {
+            "id": 5,
+            "optional": {},
+            "type": {
+              "_": "'null' is $10^N mistake.",
+              "object": {}
+            }
+          },
+          "boolean": {
+            "id": 6,
+            "optional": {},
+            "type": {
+              "_": "'boolean' is <true> or <false>.",
+              "object": {
+                "fields": {
+                  "always": {
+                    "id": 0,
+                    "optional": {},
+                    "type": {
+                      "_": "presence of 'always' can limit the boolean to a single value.",
+                      "object": {
+                        "fields": {
+                          "true": {
+                            "id": 0,
+                            "mutex": {},
+                            "type": {
+                              "_": "'true' is mutually exclusive with 'false'.",
+                              "object": {}
+                            }
+                          },
+                          "false": {
+                            "id": 1,
+                            "mutex": {},
+                            "type": {
+                              "_": "'false' is mutually exclusive with 'true'.",
+                              "object": {}
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "float": {
+            "id": 7,
+            "optional": {},
+            "type": {
+              "_": "'float' is a <number> and not a <bigint>.",
+              "object": {
+                "fields": {
+                  "depth": {
+                    "id": 0,
+                    "optional": {},
+                    "type": {
+                      "_": "(NOT YET IMPLEMENTED) Presence of 'depth' restricts bit-depths (e.g. f32).",
+                      "object": {}
+                    }
+                  },
+                  "safe": {
+                    "id": 1,
+                    "optional": {},
+                    "type": {
+                      "_": "Presence of 'safe' restricts to the integer-safe-float range.",
+                      "object": {
+                        "fields": {
+                          "integer": {
+                            "id": 0,
+                            "optional": {},
+                            "type": {
+                              "_": "Presence of 'integer' forbids any fractional component.",
+                              "object": {}
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "int": {
+            "id": 8,
+            "optional": {},
+            "type": {
+              "_": "'int' is a <number | bigint>.",
+              "object": {
+                "fields": {
+                  "unsigned": {
+                    "id": 0,
+                    "optional": {},
+                    "type": {
+                      "_": "(NOT YET IMPLEMENTED) Presence of 'unsigned' indicates non-negatives clamping (e.g. u64).",
+                      "object": {}
+                    }
+                  },
+                  "depth": {
+                    "id": 1,
+                    "optional": {},
+                    "type": {
+                      "_": "(NOT YET IMPLEMENTED) Presence of 'depth' restricts bit-depths (e.g. i16).",
+                      "object": {
+                        "fields": {
+                          "32": {
+                            "id": 0,
+                            "mutex": {},
+                            "type": { "_": "", "object": {} }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "safe": {
+                    "id": 2,
+                    "optional": {},
+                    "type": {
+                      "_": "Presence of 'safe' restricts to the integer-safe-float range.",
+                      "object": {}
+                    }
+                  },
+                  "enums": {
+                    "id": 3,
+                    "optional": {},
+                    "type": {
+                      "_": "(NOT YET IMPLEMENTED) Presence of 'enums' permits only this object's keys.",
+                      "object": {
+                        "keys": { "numeric": {} },
+                        "values": {
+                          "type": { "_": "", "object": {} }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "string": {
+            "id": 9,
+            "optional": {},
+            "type": {
+              "_": "'string' is text (much like this sentence).",
+              "object": {
+                "fields": {
+                  "enums": {
+                    "id": 0,
+                    "optional": {},
+                    "type": {
+                      "_": "Presence of 'enums' permits only this object's keys.",
+                      "object": {
+                        "values": {
+                          "type": { "_": "", "object": {} }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "method": {
+            "id": 10,
+            "optional": {},
+            "type": {
+              "_": "'method' describes a method signature.",
+              "like": { "valid": { "Behavior": {} } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "Behavior": {
+    "id": 6,
+    "type": {
+      "_": "'Behavior' describes how a function behaves.",
+      "object": {
+        "fields": {
+          "ts": {
+            "id": 0,
+            "mutex": {},
+            "type": {
+              "_": "Tagged with a language-specifying file-extension.",
+              "object": {
+                "fields": {
+                  "awaits": {
+                    "id": 0,
+                    "optional": {},
+                    "type": {
+                      "_": "Presence of 'awaits' indicates asynchrony (e.g <typeof async () => {}>).",
+                      "object": {}
+                    }
+                  },
+                  "yields": {
+                    "id": 1,
+                    "optional": {},
+                    "type": {
+                      "_": "'yields' describes incrementality (e.g. <typeof function*() { consumes = yield produces; }>).",
+                      "object": {
+                        "fields": {
+                          "produces": {
+                            "id": 0,
+                            "optional": {},
+                            "type": {
+                              "_": "",
+                              "like": { "schema": {} }
+                            }
+                          },
+                          "consumes": {
+                            "id": 1,
+                            "optional": {},
+                            "type": {
+                              "_": "",
+                              "like": { "schema": {} }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "takes": {
+                    "id": 2,
+                    "optional": {},
+                    "type": {
+                      "_": "'takes' describes function parameters (e.g. <(...args: takes) => unknown>).",
+                      "array": {
+                        "items": {
+                          "type": {
+                            "_": "",
+                            "like": { "schema": {} }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "returns": {
+                    "id": 3,
+                    "optional": {},
+                    "type": {
+                      "_": "'returns' describes the type of the final output (with consideration for 'awaits'/'yields').",
+                      "like": { "schema": {} }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "Declaration": {
+    "id": 7,
+    "type": {
+      "_": "'Declaration' describes a type.",
+      "object": {
+        "fields": {
+          "type": {
+            "id": 0,
+            "type": {
+              "_": "'type' is the Schema being declared.",
+              "like": { "schema": {} }
+            }
+          }
+        }
+      }
+    }
+  },
+  "Field": {
+    "id": 8,
+    "type": {
+      "_": "'Field' describes the attributes of an object's 'fields'.",
+      "object": {
+        "fields": {
+          "id": {
+            "id": 0,
+            "type": {
+              "_": "'id' is used to reconcile object 'fields' that are renamed between registry versions -- keep it stable!",
+              "int": {}
+            }
+          },
+          "mutex": {
+            "id": 1,
+            "optional": {},
+            "type": {
+              "_": "Exactly one of an objects 'fields' with 'mutex' present must exist unless none have 'mutex' present.",
+              "object": {}
+            }
+          },
+          "optional": {
+            "id": 2,
+            "optional": {},
+            "type": {
+              "_": "Presence of 'optional' permits the absence in the object.",
+              "object": {}
+            }
+          },
+          "type": {
+            "id": 3,
+            "type": {
+              "_": "'type' is the Schema to match.",
+              "like": { "schema": {} }
+            }
+          }
+        }
+      }
+    }
+  }
+}

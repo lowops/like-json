@@ -1,0 +1,7 @@
+{
+  "tasks": {
+    "gzip": "gzip -k ./ts/dist/like-json.js",
+    "bundle": "npx esbuild ./ts/src/like-json.ts --bundle --minify --outfile=./ts/dist/like-json.js",
+    "emit": "deno bundle ./ts/src/like-json.ts -- ts/dist/like-json.js"
+  }
+}
