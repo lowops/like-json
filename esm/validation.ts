@@ -5,14 +5,14 @@ import type {
   Behavior,
   Declaration,
   Field,
-  Inferred,
+  Native,
   KeysFrom,
   Or,
   Pattern,
   Registrations,
   Registry,
   Schema,
-} from "./like-inferred.d.ts";
+} from "./native.d.ts";
 
 // TODO: beg for export type * from ""; https://github.com/microsoft/TypeScript/issues/37238
 export type {
@@ -20,7 +20,7 @@ export type {
   Behavior,
   Declaration,
   Field,
-  Inferred,
+  Native,
   KeysFrom,
   Or,
   Pattern,
@@ -28,7 +28,7 @@ export type {
   Registries,
   Registry,
   Schema,
-} from "./like-inferred.d.ts";
+} from "./native.d.ts";
 
 const isDataView = function (this: () => any, val: any): val is DataView {
   return this.call(val) === "[object DataView]";
@@ -68,18 +68,18 @@ export const likeValid = maybeValid;
 function maybeValid<
   R extends Registrations | undefined,
   T extends Schema | KeysFrom<R>,
-  V extends Inferred<R, T>,
+  V extends Native<R, T>,
 >(use: R, nameOrSchema: T, value: V): V;
 
 function maybeValid<
   R extends Registrations | undefined,
   T extends Schema | KeysFrom<R>,
->(use: R, nameOrSchema: T): Inferred<R, T> | undefined;
+>(use: R, nameOrSchema: T): Native<R, T> | undefined;
 
 function maybeValid<
   R extends Registrations | undefined,
   T extends Schema | KeysFrom<R>,
-  V extends Inferred<R, T>,
+  V extends Native<R, T>,
 >(use: R, nameOrSchema: T, value?: V) {
   return value;
 }
@@ -113,7 +113,7 @@ export const asUnsafe = <
   target: unknown,
   nameOrSchema?: T,
   use?: R,
-): target is Inferred<R, T> => true;
+): target is Native<R, T> => true;
 
 const resolveSchema = <
   T extends Schema | KeysFrom<R>,
@@ -151,7 +151,7 @@ export const isValid = <
   nameOrSchema: T,
   target: unknown,
   height = 256,
-): target is Inferred<R, T> => {
+): target is Native<R, T> => {
   return !notValid(target, nameOrSchema, use, height, new Set(), null);
 };
 

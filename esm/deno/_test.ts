@@ -1,11 +1,11 @@
-import stdlib from "#/ts/src/like.json" assert { type: "json" };
+import stdlib from "#/esm/like.json" assert { type: "json" };
 import {
   isField,
   isRegistry,
   isSchema,
   isValid,
   likeValid,
-} from "#/ts/src/like-valid.ts";
+} from "#/esm/validation.ts";
 
 const deno = globalThis["Deno"];
 

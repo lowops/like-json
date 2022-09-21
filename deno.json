@@ -1,8 +1,8 @@
 {
   "importMap": "./importmap.json",
   "tasks": {
-    "gzip": "gzip -k ./ts/dist/like-json.js",
-    "bundle": "npx esbuild ./ts/src/like-json.ts --bundle --minify --outfile=./ts/dist/like-json.js",
-    "emit": "deno bundle ./ts/src/like-json.ts -- ts/dist/like-json.js"
+    "gzip": "gzip -k ./esm/text.js",
+    "bundle": "npx esbuild ./esm/text.ts --bundle --minify --outfile=./esm/text.js",
+    "emit": "deno bundle ./esm/text.ts -- esm/text.js"
   }
 }

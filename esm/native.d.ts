@@ -85,7 +85,7 @@ export interface Or {
   [id: number]: Schema;
 }
 
-// TODO: ...consider making Pattern a "mutex"
+// TODO: ...consider the pros/cons of making Pattern a Mutex<{}>
 export interface Pattern {
   _: string; // can be used for documentation
   ""?: never; // metadata/documentation placeholder
@@ -165,7 +165,7 @@ type ToObject<
   [N in keyof MandatoryUnless<F, { optional: {} }>]: Valid<F[N]["type"], R>;
 };
 
-type Native<
+type Inferred<
   S extends Schema, // | KeysFrom<R>, // ts(2589) Type instantiation is excessively deep and possibly infinite.
   R extends Registrations | undefined,
 > = [
@@ -331,17 +331,19 @@ type Native<
 type Valid<
   S extends Schema, // = R["_"],
   R extends Registrations | undefined,
-> = S extends Pattern ? Native<S, R>
+> = S extends Pattern ? Inferred<S, R>
   : S extends And ? (
       number & keyof S extends never ? unknown : (
         Squash<
-          { [N in number & keyof S[N]]: Native<S[N], R> }[number & keyof S]
+          { [N in number & keyof S[N]]: Inferred<S[N], R> }[number & keyof S]
         >
       )
     )
   : S extends Or ? (
       {
-        [N in number & keyof S]: S[N] extends Pattern ? Native<S[N], R> : never;
+        [N in number & keyof S]: (
+          S[N] extends Pattern ? Inferred<S[N], R> : never
+        );
       }[number & keyof S]
     )
   : never;
@@ -356,7 +358,7 @@ type Lookup<
   )
   : never;
 
-export type Inferred<
+export type Native<
   R extends Registrations | undefined,
   T extends Schema | KeysFrom<R> = "_" extends KeysFrom<R> ? "_" : never,
 > = (
