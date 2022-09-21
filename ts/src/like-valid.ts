@@ -1,11 +1,13 @@
 import stdlib from "./like.json" assert { type: "json" };
 
 import type {
+  And,
   Behavior,
   Declaration,
   Field,
   Inferred,
   KeysFrom,
+  Or,
   Pattern,
   Registrations,
   Registry,
@@ -14,18 +16,18 @@ import type {
 
 // TODO: beg for export type * from ""; https://github.com/microsoft/TypeScript/issues/37238
 export type {
-  KeysFrom,
-  Registrations,
-  Registries,
-  Registry,
-  Schema,
   And,
-  Or,
-  Pattern,
   Behavior,
   Declaration,
   Field,
   Inferred,
+  KeysFrom,
+  Or,
+  Pattern,
+  Registrations,
+  Registries,
+  Registry,
+  Schema,
 } from "./like-inferred.d.ts";
 
 const isDataView = function (this: () => any, val: any): val is DataView {
@@ -113,12 +115,33 @@ export const asUnsafe = <
   use?: R,
 ): target is Inferred<R, T> => true;
 
-// TODO: determine why typeof schema["_"] provides insufficient inference...
-const isTrivial = (schema: Schema): schema is Pattern => {
-  return typeof schema["_"] === "string";
+const resolveSchema = <
+  T extends Schema | KeysFrom<R>,
+  R extends Registrations | undefined,
+>(nameOrSchema: T, use: R): Schema | undefined => {
+  if (!isKeylike(nameOrSchema)) {
+    return nameOrSchema;
+  } else if (Array.isArray(use)) {
+    for (let index = 0; index < use.length; index += 1) {
+      const reg = use[index];
+      if (isKeyof(reg, nameOrSchema)) {
+        return reg[nameOrSchema].type;
+      }
+    }
+  } else if (isKeyof(use, nameOrSchema)) {
+    return use[nameOrSchema].type;
+  }
+
+  return undefined;
 };
 
-const GOTO = Symbol();
+// TODO: determine why typeof schema["_"] provides insufficient inference...
+const isTrivialSchema = (schema: Schema): schema is Pattern => {
+  return typeof schema["_"] === "string";
+};
+const isAndSchema = (schema: Schema): schema is And => {
+  return Array.isArray(schema["_"]);
+};
 
 export const isValid = <
   R extends Registrations | undefined,
@@ -127,427 +150,506 @@ export const isValid = <
   use: R,
   nameOrSchema: T,
   target: unknown,
-  budget: number = 64, // TODO: limit traversal depth and/or breadth (BinaryIs<>/TertiaryIs<>?)
-  // TODO: consider handling circular structures... (and then virtualizing the callstack to prevent overflow)
+  height = 256,
 ): target is Inferred<R, T> => {
-  return !reject(null, use, nameOrSchema, target, budget);
+  return !notValid(target, nameOrSchema, use, height, new Set(), null);
 };
 
-const reject = <
+const notValid = <
   R extends Registrations | undefined,
   T extends Schema | KeysFrom<R>,
 >(
-  yields: Array<string> | null,
-  use: R,
-  nameOrSchema: T,
   target: unknown,
-  budget: number = 64,
-): number => {
-  let match: Schema | undefined = undefined;
+  nameOrSchema: T,
+  use: R,
+  height: number,
+  saw: null | Set<unknown>,
+  cache: null | Map<unknown, Set<Schema>>,
+  // budget: number, // TODO: limit total number of comparisons
+): string => {
+  if (height < 1) throw new Error("Like: permitted traversal depth exceeded.");
 
-  if (!isKeylike(nameOrSchema)) {
-    match = nameOrSchema;
-  } else if (Array.isArray(use)) {
-    for (let index = 0; index < use.length; index += 1) {
-      const reg = use[index];
-      if (isKeyof(reg, nameOrSchema)) {
-        match = reg[nameOrSchema].type;
-        break;
-      }
-    }
-  } else if (isKeyof(use, nameOrSchema)) {
-    match = use[nameOrSchema].type;
-  }
+  const match = resolveSchema(nameOrSchema, use);
 
   if (match === null || typeof match !== "object") {
-    return yields?.push("Like: could not resolve schema object.") ?? 1;
+    return "Like: could not resolve schema object.\n";
   }
 
-  if (!isTrivial(match)) {
-    const codes = Object.keys(match);
-
-    if (Array.isArray(match._)) {
-      for (let index = 0; index < codes.length; index += 1) {
-        const key = codes[index];
-
-        if (key === "" || key === "_") continue;
-
-        const value = match[key];
-
-        if (!reject(yields, use, value, target, budget)) {
-          return (0);
-        }
-        yields?.push("Like: Or validation failed.");
-      }
+  if (!isTrivialSchema(match)) {
+    if (isAndSchema(match)) {
+      return notAndMatch(target, match, use, height, saw, cache);
     } else {
-      for (let index = 0; index < codes.length; index += 1) {
-        const key = codes[index];
-
-        if (key === "" || key === "_") continue;
-
-        const value = match[key];
-
-        if (reject(yields, use, value[key], target, budget)) {
-          if (!yields) return 1;
-          yields?.push("Like: And validation failed.");
-        }
-      }
-
-      if (!yields?.length) return (0);
+      return notOrMatch(target, match, use, height, saw, cache);
     }
-
-    return yields?.push("Like: Logical validation failed.") ?? 1;
   }
 
-  try {
-    switch (typeof target) {
-      default: {
-        yields?.push("Like: unrecognized typeof value.");
-        throw GOTO;
+  if (saw) {
+    if (saw.has(target)) throw new Error("Like: will not allow circular refs.");
+
+    saw.add(target);
+  }
+
+  const reason = notDirectMatch(target, match, use, height, saw, cache);
+
+  if (saw) saw.delete(target);
+
+  if (!reason) return "";
+
+  const absolutely = notIndirectMatch(target, match, use, height, saw, cache);
+
+  return absolutely ? reason + absolutely : "";
+};
+
+const notAndMatch = <R extends Registrations | undefined>(
+  target: unknown,
+  match: And,
+  use: R,
+  height: number,
+  saw: null | Set<unknown>,
+  cache: null | Map<unknown, Set<Schema>>,
+  // budget: number, // TODO: limit total number of comparisons
+): string => {
+  let aggregate = "";
+  const codes = Object.keys(match);
+
+  for (let index = 0; index < codes.length; index += 1) {
+    const key = codes[index];
+
+    if (key === "" || key === "_") continue;
+
+    const value = match[key];
+    const reason = notValid(target, value, use, height - 1, saw, cache);
+    if (!reason) return "";
+    aggregate += reason + "Like: Or validation failed.\n";
+  }
+
+  return aggregate;
+};
+
+const notOrMatch = <R extends Registrations | undefined>(
+  target: unknown,
+  match: Or,
+  use: R,
+  height: number,
+  saw: null | Set<unknown>,
+  cache: null | Map<unknown, Set<Schema>>,
+  // budget: number, // TODO: limit total number of comparisons
+): string => {
+  let aggregate = "";
+  const exhaustive = false;
+  const codes = Object.keys(match);
+
+  for (let index = 0; index < codes.length; index += 1) {
+    const key = codes[index];
+
+    if (key === "" || key === "_") continue;
+
+    const value = match[key];
+    const reason = notValid(target, value[key], use, height - 1, saw, cache);
+    if (!reason) continue;
+    aggregate += reason + "Like: And validation failed.\n";
+    if (!exhaustive) break;
+  }
+
+  return aggregate;
+};
+
+const notDirectMatch = <R extends Registrations | undefined>(
+  target: unknown,
+  match: Pattern,
+  use: R,
+  height: number,
+  saw: null | Set<unknown>,
+  cache: null | Map<unknown, Set<Schema>>,
+  // budget: number, // TODO: limit total number of comparisons
+): string => {
+  switch (typeof target) {
+    default: {
+      return "Like: unrecognized typeof value.\n";
+    }
+
+    case "function": {
+      return notFunctionMatch(target, match);
+    }
+
+    case "boolean": {
+      return notBooleanMatch(target, match);
+    }
+    case "bigint": {
+      return notBigIntMatch(target, match);
+    }
+    case "number": {
+      return notNumberMatch(target, match);
+    }
+    case "string": {
+      return notStringMatch(target, match);
+    }
+
+    case "object": {
+      if (target === null) {
+        return notNullMatch(target, match);
+      } else if (ArrayBuffer.isView(target)) {
+        return notViewMatch(target, match);
+      } else if (Array.isArray(target)) {
+        return notArrayMatch(target, match, use, height, saw, cache);
+      } else if (typeof target === "object") {
+        return notObjectMatch(target, match, use, height, saw, cache);
+      } else {
+        return "Like: validator panicked.\n";
       }
+    }
+  }
+};
 
-      case "function": {
-        if (typeof match["like"] === "object") {
-          if (typeof match["like"]["behavior"] === "object") {
-            return (0);
-          }
-        }
-        yields?.push("Like: function is not valid.");
-        throw GOTO;
+const notFunctionMatch = (target: Function, match: Pattern): string => {
+  if (typeof match["method"] === "object") {
+    const { ts } = match["method"];
+    if (ts) return "";
+  }
+
+  return "Like: function is not valid.\n";
+};
+
+const notBooleanMatch = (target: boolean, match: Pattern): string => {
+  if (typeof match["boolean"] !== "object") {
+    return "Like: boolean is not valid.\n";
+  }
+
+  const { always } = match["boolean"];
+
+  if (!always) return "";
+
+  if (always.true) {
+    return target === true ? "" : "Like: boolean must be true.\n";
+  }
+
+  if (always.false) {
+    return target === false ? "" : "Like: boolean must be false.\n";
+  }
+
+  return "";
+};
+
+const notBigIntMatch = (target: bigint, match: Pattern): string => {
+  if (typeof match["int"] !== "object") {
+    return "Like: bigint is not valid.\n";
+  }
+
+  // TODO: "depth"
+  // TODO: "enums"
+  const { safe, depth, enums } = match["int"];
+
+  if (typeof safe !== "object") return "";
+  if (target > Number.MAX_SAFE_INTEGER) {
+    return "Like: bigint is not safe.\n";
+  }
+  if (target < Number.MIN_SAFE_INTEGER) {
+    return "Like: bigint is not safe.\n";
+  }
+
+  return "";
+};
+
+const notNumberMatch = (target: number, match: Pattern): string => {
+  // TODO: "depth"
+  // TODO: "enums"
+  let float = true;
+
+  if (typeof match["float"] !== "object") {
+    if (typeof match["int"] !== "object") {
+      return "Like: number is not valid.\n";
+    }
+    float = false;
+  } else if (typeof match["float"].safe === "object") {
+    float = typeof match["float"].safe.integer !== "object";
+  } else {
+    if (Number.isFinite(target)) "";
+    return "Like: number is not finite.\n";
+  }
+
+  if (target > Number.MAX_SAFE_INTEGER) {
+    return "Like: number is not safe.\n";
+  }
+  if (target < Number.MIN_SAFE_INTEGER) {
+    return "Like: number is not safe.\n";
+  }
+
+  if (float) {
+    if (!Number.isNaN(target)) return "";
+    return "Like: number isNaN.\n";
+  }
+
+  if (target === Math.floor(target)) return "";
+  return "Like: number is not integer.\n";
+};
+
+const notStringMatch = (target: string, match: Pattern): string => {
+  if (typeof match["string"] !== "object") {
+    return "Like: string is not valid.\n";
+  }
+
+  const { enums } = match["string"];
+
+  if (enums && typeof enums[target] !== "object") {
+    return "Like: string enum failed validation.\n";
+  }
+
+  return "";
+};
+
+const notNullMatch = (target: null, match: Pattern): string => {
+  if (typeof match["null"] === "object") return "";
+  return "Like: null is not valid.\n";
+};
+
+const notViewMatch = (target: ArrayBufferView, match: Pattern): string => {
+  if (typeof match["data"] === "object" && isDataView(target)) return "";
+  return "Like: buffer-view is not valid.\n";
+};
+
+const notArrayMatch = <R extends Registrations | undefined>(
+  target: Array<any>,
+  match: Pattern,
+  use: R,
+  height: number,
+  saw: null | Set<unknown>,
+  cache: null | Map<unknown, Set<Schema>>,
+  // budget: number, // TODO: limit total number of comparisons
+): string => {
+  if (typeof match["array"] !== "object") {
+    return "Like: array is not valid.\n";
+  }
+
+  const { items, prefix } = match["array"];
+  const suffix = typeof items === "object";
+  let rest = !prefix;
+
+  if (items || prefix) {
+    for (let index = 0; index < target.length; index += 1) {
+      const entry = !rest && prefix ? prefix[index] : undefined;
+
+      if (entry && typeof entry.type === "object") {
+        const next = target[index];
+        const { type } = entry;
+
+        const reason = notValid(next, type, use, height - 1, saw, cache);
+        if (!reason) continue;
+        return reason + "Like: tuple prefix " + index + " invalid.\n";
+      } else if (suffix) {
+        const next = target[index];
+        const { type } = items;
+        rest = true;
+
+        const reason = notValid(next, type, use, height - 1, saw, cache);
+        if (!reason) continue;
+        return prefix
+          ? reason + "Like: tuple suffix " + index + " invalid.\n"
+          : reason + "Like: array item " + index + " invalid.\n";
       }
+    }
+  }
 
-      case "boolean": {
-        if (typeof match["boolean"] !== "object") {
-          yields?.push("Like: boolean is not valid.");
-          throw GOTO;
+  return "";
+};
+
+const notObjectMatch = <R extends Registrations | undefined>(
+  target: object,
+  match: Pattern,
+  use: R,
+  height: number,
+  saw: null | Set<unknown>,
+  cache: null | Map<unknown, Set<Schema>>,
+  // budget: number, // TODO: limit total number of comparisons
+): string => {
+  if (typeof match["object"] !== "object") {
+    return "Like: object is not valid.\n";
+  }
+
+  const { values, fields } = match["object"];
+
+  if (fields && typeof fields === "object") {
+    const props = Object.keys(fields);
+
+    let count = 0;
+    let mutex = false;
+    let optional = false;
+
+    for (let index = 0; index < props.length; index += 1) {
+      const label = props[index];
+      const entry = fields[label];
+
+      if (entry && typeof entry.mutex === "object") {
+        mutex = true;
+        if (
+          isKeyof(target, label) && (target[label] ?? null) !== null
+        ) {
+          count += 1;
+          if (count > 1) break;
+        } else if (typeof entry.optional === "object") {
+          optional = true;
         }
-        return (0);
       }
-      case "bigint": {
-        if (typeof match["int"] !== "object") {
-          yields?.push("Like: bigint is not valid.");
-          throw GOTO;
-        }
+    }
 
-        // TODO: "depth"
-        // TODO: "enums"
-        const { safe, depth, enums } = match["int"];
-
-        if (typeof safe !== "object") return (0);
-        if (target > Number.MAX_SAFE_INTEGER) {
-          yields?.push("Like: bigint is not safe.");
-          throw GOTO;
-        }
-        if (target < Number.MIN_SAFE_INTEGER) {
-          yields?.push("Like: bigint is not safe.");
-          throw GOTO;
-        }
-        return (0);
+    if (mutex) {
+      if (count > 1 || count === 0 && !optional) {
+        return "Like: mutex validation failed.\n";
       }
-      case "number": {
-        // TODO: "depth"
-        // TODO: "enums"
-        let float = true;
+    }
 
-        if (typeof match["float"] !== "object") {
-          if (typeof match["int"] !== "object") {
-            yields?.push("Like: number is not valid.");
-            throw GOTO;
-          }
-          float = false;
-        } else if (typeof match["float"].safe === "object") {
-          float = typeof match["float"].safe.integer !== "object";
+    for (let index = 0; index < props.length; index += 1) {
+      const label = props[index];
+      const entry = fields[label];
+
+      if (entry && typeof entry.type === "object") {
+        if (
+          isKeyof(target, label) && (target[label] ?? null) !== null
+        ) {
+          const next = target[label];
+          const { type } = entry;
+
+          const reason = notValid(next, type, use, height - 1, saw, cache);
+          if (!reason) continue;
+          return reason + "Like: object field " + index + " invalid.\n";
         } else {
-          if (Number.isFinite(target)) return (0);
-          yields?.push("Like: number is not finite.");
-          throw GOTO;
-        }
-
-        if (target > Number.MAX_SAFE_INTEGER) {
-          yields?.push("Like: number is not safe.");
-          throw GOTO;
-        }
-        if (target < Number.MIN_SAFE_INTEGER) {
-          yields?.push("Like: number is not safe.");
-          throw GOTO;
-        }
-
-        if (float) {
-          if (!Number.isNaN(target)) return (0);
-          yields?.push("Like: number isNaN.");
-          throw GOTO;
-        }
-
-        if (target === Math.floor(target)) return (0);
-        yields?.push("Like: number is not integer.");
-        throw GOTO;
-      }
-
-      case "object": {
-        if (target === null) {
-          if (typeof match["null"] === "object") return (0);
-          yields?.push("Like: null is not valid.");
-          throw GOTO;
-        } else if (ArrayBuffer.isView(target)) {
-          if (typeof match["data"] === "object" && isDataView(target)) {
-            return (0);
-          }
-          yields?.push("Like: buffer-view is not valid.");
-          throw GOTO;
-        } else if (Array.isArray(target)) {
-          if (typeof match["array"] !== "object") {
-            yields?.push("Like: array is not valid.");
-            throw GOTO;
-          }
-
-          const { items, prefix } = match["array"];
-          const suffix = typeof items === "object";
-          let rest = !prefix;
-
-          if (items || prefix) {
-            for (let index = 0; index < target.length; index += 1) {
-              const entry = !rest && prefix ? prefix[index] : undefined;
-
-              if (entry && typeof entry.type === "object") {
-                if (reject(yields, use, entry.type, target[index], budget)) {
-                  yields?.push("Like: tuple prefix " + index + " invalid.");
-                  throw GOTO;
-                }
-              } else if (suffix) {
-                rest = true;
-                if (reject(yields, use, items.type, target[index], budget)) {
-                  if (prefix) {
-                    yields?.push("Like: tuple suffix " + index + " invalid.");
-                  } else {
-                    yields?.push("Like: array item " + index + " invalid.");
-                  }
-                  throw GOTO;
-                }
-              }
-            }
-          }
-
-          return (0);
-        } else if (typeof target === "object") {
-          if (typeof match["object"] !== "object") {
-            yields?.push("Like: object is not valid.");
-            throw GOTO;
-          }
-
-          const { values, fields } = match["object"];
-
-          if (fields && typeof fields === "object") {
-            const props = Object.keys(fields);
-
-            let count = 0;
-            let mutex = false;
-            let optional = false;
-
-            for (let index = 0; index < props.length; index += 1) {
-              const label = props[index];
-              const entry = fields[label];
-
-              if (entry && typeof entry.mutex === "object") {
-                mutex = true;
-                if (
-                  isKeyof(target, label) && (target[label] ?? null) !== null
-                ) {
-                  count += 1;
-                  if (count > 1) break;
-                } else if (typeof entry.optional === "object") {
-                  optional = true;
-                }
-              }
-            }
-
-            if (mutex) {
-              if (count > 1 || count === 0 && !optional) {
-                yields?.push("Like: mutex validation failed.");
-                throw GOTO;
-              }
-            }
-
-            for (let index = 0; index < props.length; index += 1) {
-              const label = props[index];
-              const entry = fields[label];
-
-              if (entry && typeof entry.type === "object") {
-                if (
-                  isKeyof(target, label) && (target[label] ?? null) !== null
-                ) {
-                  if (reject(yields, use, entry.type, target[label], budget)) {
-                    yields?.push("Like: object field " + index + " invalid.");
-                    throw GOTO;
-                  }
-                } else {
-                  if (typeof entry.optional === "object") continue;
-                  if (typeof entry.mutex === "object") continue;
-                  yields?.push("Like: object field " + index + " missing.");
-                  throw GOTO;
-                }
-              }
-            }
-
-            if (typeof values === "object") {
-              const keys = Object.keys(target);
-
-              for (let index = 0; index < keys.length; index += 1) {
-                const label = keys[index];
-
-                if (!fields[label]) {
-                  if (reject(yields, use, values.type, target[label], budget)) {
-                    yields?.push("Like: object value " + index + " invalid.");
-                    throw GOTO;
-                  }
-                }
-              }
-            }
-
-            return (0);
-          } else if (values && typeof values === "object") {
-            const keys = Object.keys(target);
-
-            for (let index = 0; index < keys.length; index += 1) {
-              const label = keys[index];
-
-              if (reject(yields, use, values.type, target[label], budget)) {
-                yields?.push("Like: object entry " + index + " invalid.");
-                throw GOTO;
-              }
-            }
-
-            return (0);
-          } else {
-            return (0);
-          }
-        } else {
-          yields?.push("Like: validator panicked.");
-          throw GOTO;
+          if (typeof entry.optional === "object") continue;
+          if (typeof entry.mutex === "object") continue;
+          return "Like: object field " + index + " missing.\n";
         }
       }
-
-      case "string": {
-        if (typeof match["string"] !== "object") {
-          yields?.push("Like: string is not valid.");
-          throw GOTO;
-        }
-        const { enums } = match["string"];
-        const raw = typeof target === "string" ? target : String(target);
-
-        if (enums && typeof enums[raw] !== "object") {
-          yields?.push("Like: string enum failed validation.");
-          throw GOTO;
-        }
-
-        return (0);
-      }
-    }
-  } catch (err) {
-    if (err !== GOTO) throw err;
-
-    if (!match["like"]) {
-      return yields?.push("Like: pre-like validation failed.") ?? 1;
     }
 
-    const like = match["like"];
-
-    if (like.pattern) {
-      if (!reject(yields, stdlib, stdlib.Pattern.type, target, budget)) {
-        return (0);
-      }
-      yields?.push("Like: Pattern validation failed.");
-    }
-
-    if (like.field) {
-      if (!reject(yields, stdlib, stdlib.Field.type, target, budget)) {
-        return (0);
-      }
-      yields?.push("Like: Field<optional> validation failed.");
-    }
-
-    if (like.declaration) {
-      if (!reject(yields, stdlib, stdlib.Declaration.type, target, budget)) {
-        return (0);
-      }
-      yields?.push("Like: Field<required> validation failed.");
-    }
-
-    if (like.behavior) {
-      if (!reject(yields, stdlib, stdlib.Behavior.type, target, budget)) {
-        return (0);
-      }
-      yields?.push("Like: Behavior validation failed.");
-    }
-
-    if (like.schema) {
-      if (!reject(yields, stdlib, stdlib.Schema.type, target, budget)) {
-        return (0);
-      }
-      yields?.push("Like: Schema validation failed.");
-    }
-
-    if (like.registry) {
-      if (!reject(yields, stdlib, stdlib.Registry.type, target, budget)) {
-        return (0);
-      }
-      yields?.push("Like: Registry validation failed.");
-    }
-
-    if (like.valid) {
-      const { valid } = like;
-      const keys = Object.keys(valid);
+    if (typeof values === "object") {
+      const keys = Object.keys(target);
 
       for (let index = 0; index < keys.length; index += 1) {
         const label = keys[index];
 
-        if (!valid[label]) continue;
+        if (!fields[label]) {
+          const next = target[label];
+          const { type } = values;
 
-        // type assertion here because "T extends KeysFrom<R>" gives better auto-complete hints than string
-        // (and because this is a more _obvious_ lie than "label as KeysFrom<R>")
-        if (!reject(yields, use, label as never, target, budget)) {
-          return (0);
+          const reason = notValid(next, type, use, height - 1, saw, cache);
+          if (!reason) continue;
+          return reason + "Like: object value " + index + " invalid.\n";
         }
-        yields?.push("Like: Valid<T> validation failed.");
       }
     }
+  } else if (values && typeof values === "object") {
+    const keys = Object.keys(target);
 
-    return yields?.push("Like: post-like validation failed.") ?? 1;
+    for (let index = 0; index < keys.length; index += 1) {
+      const label = keys[index];
+      const next = target[label];
+      const { type } = values;
+
+      const reason = notValid(next, type, use, height - 1, saw, cache);
+      if (!reason) continue;
+      return reason + "Like: object entry " + index + " invalid.\n";
+    }
   }
+
+  return "";
 };
 
-type BinaryIs<T> = (val: unknown, budget?: unknown) => val is T;
+const notIndirectMatch = <R extends Registrations | undefined>(
+  target: unknown,
+  match: Pattern,
+  use: R,
+  height: number,
+  saw: null | Set<unknown>,
+  cache: null | Map<unknown, Set<Schema>>,
+  // budget: number, // TODO: limit total number of comparisons
+): string => {
+  if (!match["like"]) {
+    return "Like: likenesses are not valid.\n";
+  }
+
+  const like = match["like"];
+  let aggregate = "";
+
+  if (like.pattern) {
+    const { type } = stdlib.Pattern;
+    const reason = notValid(target, type, stdlib, height - 1, saw, cache);
+    if (!reason) return "";
+    aggregate += reason + "Like: Pattern validation failed.\n";
+  }
+
+  if (like.field) {
+    const { type } = stdlib.Field;
+    const reason = notValid(target, type, stdlib, height - 1, saw, cache);
+    if (!reason) return "";
+    aggregate += reason + "Like: Field<optional> validation failed.\n";
+  }
+
+  if (like.declaration) {
+    const { type } = stdlib.Declaration;
+    const reason = notValid(target, type, stdlib, height - 1, saw, cache);
+    if (!reason) return "";
+    aggregate += reason + "Like: Field<required> validation failed.\n";
+  }
+
+  if (like.behavior) {
+    const { type } = stdlib.Behavior;
+    const reason = notValid(target, type, stdlib, height - 1, saw, cache);
+    if (!reason) return "";
+    aggregate += reason + "Like: Behavior validation failed.\n";
+  }
+
+  if (like.schema) {
+    const { type } = stdlib.Schema;
+    const reason = notValid(target, type, stdlib, height - 1, saw, cache);
+    if (!reason) return "";
+    aggregate += reason + "Like: Schema validation failed.\n";
+  }
+
+  if (like.registry) {
+    const { type } = stdlib.Registry;
+    const reason = notValid(target, type, stdlib, height - 1, saw, cache);
+    if (!reason) return "";
+    aggregate += reason + "Like: Registry validation failed.\n";
+  }
+
+  if (like.valid) {
+    const { valid } = like;
+    const keys = Object.keys(valid);
+
+    for (let index = 0; index < keys.length; index += 1) {
+      const label = keys[index];
+
+      if (!valid[label]) continue;
+
+      // type assertion here because "T extends KeysFrom<R>" gives better auto-complete hints than string
+      // (and because this is a more _obvious_ lie than "label as KeysFrom<R>")
+      const name = label as never;
+      const reason = notValid(target, name, use, height - 1, saw, cache);
+      if (!reason) return "";
+      aggregate += reason + "Like: Valid<T> validation failed.\n";
+    }
+  }
+
+  return aggregate + "Like: post-like validation failed.\n";
+};
+
+type IsValid<T> = (val: unknown, height?: number) => val is T;
 // TODO: confirm if [T] extends [infer V] is needed (distributed types?)
 
-export const isSchema = <BinaryIs<Schema>> (
+export const isSchema = <IsValid<Schema>> (
   isValid.bind(null, stdlib, stdlib.Schema.type)
 );
-export const isRegistry = <BinaryIs<Registry>> (
+export const isRegistry = <IsValid<Registry>> (
   isValid.bind(null, stdlib, stdlib.Registry.type)
 );
-export const isBehavior = <BinaryIs<Behavior>> (
+export const isBehavior = <IsValid<Behavior>> (
   isValid.bind(null, stdlib, stdlib.Behavior.type)
 );
 
-export const isPattern = <BinaryIs<Pattern>> (
+export const isPattern = <IsValid<Pattern>> (
   isValid.bind(null, stdlib, stdlib.Pattern.type)
 );
-export const isField = <BinaryIs<Field>> (
+export const isField = <IsValid<Field>> (
   isValid.bind(null, stdlib, stdlib.Field.type)
 );
-export const isDeclaration = <BinaryIs<Declaration>> (
+export const isDeclaration = <IsValid<Declaration>> (
   isValid.bind(null, stdlib, stdlib.Declaration.type)
 );
-
-const specGenF = <
-  Y,
-  A extends Array<any>,
-  F extends (...args: A) => Generator<unknown, unknown, Y & unknown>,
->(y: Y, fn: F) => fn;
-
-specGenF(<string> Object(), function* ok(request: {}, inputs: []) {
-  yield 0;
-
-  yield 1;
-
-  return true;
-});

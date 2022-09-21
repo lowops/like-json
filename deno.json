@@ -1,4 +1,5 @@
 {
+  "importMap": "./importmap.json",
   "tasks": {
     "gzip": "gzip -k ./ts/dist/like-json.js",
     "bundle": "npx esbuild ./ts/src/like-json.ts --bundle --minify --outfile=./ts/dist/like-json.js",

@@ -1,10 +1,11 @@
-import stdlib from "../ts/src/like.json" assert { type: "json" };
+import stdlib from "#/ts/src/like.json" assert { type: "json" };
 import {
   isField,
   isRegistry,
   isSchema,
+  isValid,
   likeValid,
-} from "../ts/src/like-valid.ts";
+} from "#/ts/src/like-valid.ts";
 
 const deno = globalThis["Deno"];
 
@@ -37,6 +38,48 @@ deno.test("like-json validation: false positive", async () => {
   } catch (err) {
     if (err !== Symbol.for("expected")) {
       throw new Error("isField() may have given a false positive.");
+    }
+  }
+});
+
+deno.test("like-json validation: reject circular references", async () => {
+  const registry = likeValid(stdlib, "Registry", {
+    "Recursive": {
+      "id": 0,
+      "type": {
+        "_": "Array containing nulls or other arrays of the same.",
+        "array": {
+          "items": {
+            "type": {
+              "_": "Maybe loop.",
+              "null": {},
+              "like": {
+                "valid": { "Recursive": {} }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const value = new Array();
+  value.push([[[null]]]);
+
+  if (!isValid(registry, "Recursive", value)) {
+    throw new Error("Non-circular failed schema validation.");
+  }
+
+  try {
+    value.push(value);
+
+    isValid(registry, "Recursive", value);
+    throw Symbol.for("unexpected");
+  } catch (err) {
+    if (err === Symbol.for("unexpected")) {
+      throw new Error("isValid() should reject graphs with circular refs.");
+    } else {
+      // console.log("[Matched Expectations]", err && err.message || err);
     }
   }
 });

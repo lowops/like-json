@@ -4,9 +4,21 @@ declare global {
   }
 }
 
-type MandatoryUnless<E, T> =
+type Mutex<T> = {
+  [P in keyof T]: {
+    [N in keyof MandatoryUnless<{ [M in keyof T]: M }, Exclude<keyof T, P>>]: (
+      N extends P ? T[N] : never
+    );
+  };
+}[keyof T];
+
+type MandatoryUnless<T, E> =
   & { [P in keyof T as T[P] extends E ? never : P]: T[P] }
   & { [P in keyof T as T[P] extends E ? P : never]?: T[P] };
+
+type AttenuatedUnless<T, E> = {
+  [P in keyof T as T[P] extends E ? P : never]: T[P];
+};
 
 type Squash<U> = Intersect<U> extends infer I ? (
     I extends never ? never
@@ -14,6 +26,7 @@ type Squash<U> = Intersect<U> extends infer I ? (
       : I
   )
   : never;
+
 // https://stackoverflow.com/questions/50374908/transform-union-type-to-intersection-type#answer-50375286
 type Intersect<U> = (
   U extends any ? (u: U) => void : never
@@ -67,7 +80,7 @@ export interface And {
 
 // TODO: re-evaluate use of object & {} everywhere
 export interface Or {
-  _: object & {};
+  _: Exclude<object & {}, Array<any>>;
   ""?: never; // metadata/documentation placeholder
   [id: number]: Schema;
 }
@@ -81,7 +94,10 @@ export interface Pattern {
   "data"?: object & {};
   "null"?: object & {};
   "boolean"?: {
-    always?: { true: object & {} } | { false: object & {} };
+    always?: (
+      | { true: object & {}, false?: never }
+      | { false: object & {}, true?: never }
+    );
   };
   "float"?: {
     depth?: object & {};
@@ -141,6 +157,13 @@ export interface Field {
 
 type BigString<T extends bigint> = `${T}`;
 type FloatString<T extends number> = `${T}`;
+
+type ToObject<
+  F extends { [name: string]: Field },
+  R extends Registrations | undefined,
+> = {
+  [N in keyof MandatoryUnless<F, { optional: {} }>]: Valid<F[N]["type"], R>;
+};
 
 type Native<
   S extends Schema, // | KeysFrom<R>, // ts(2589) Type instantiation is excessively deep and possibly infinite.
@@ -235,32 +258,66 @@ type Native<
                 ? { [id: number]: Valid<V["type"], R> }
                 : { [key: string]: Valid<V["type"], R> }
             )
-            : object & {}
+            : (
+              keyof F extends never ? object & {} : unknown
+            )
         )
         & (
           F extends { [name: string]: Field } ? (
+              // AttenuatedUnless<F, { mutex: {} }> extends infer T ? (
+              //     keyof T extends never ? (
+              //         ToObject<F, R>
+              //       )
+              //       : T extends { [name: string]: Field } ? (
+              //           & Mutex<ToObject<T, R>>
+              //           & ToObject<Omit<F, keyof T>, R>
+              //         )
+              //       : never
+              //   )
+              //   : never
+
+              // TODO: figure out how to get good type hints with ToObject/AttenuatedUnless
               {
-                [M in keyof F as F[M] extends { mutex: {} } ? M : never]: null;
+                [M in keyof F as F[M] extends { mutex: {} } ? M : never]: F[M];
               } extends infer T ? (
-                  keyof T extends never ? (
-                      {
-                        [N in keyof MandatoryUnless<{ optional: {} }, F>]: (
-                          Valid<F[N]["type"], R>
-                        );
-                      }
-                    )
-                    : {
-                      [M in keyof T]: {
-                        [
-                          N in keyof MandatoryUnless<
-                            { optional: {} },
-                            Omit<F, Exclude<keyof T, M>>
-                          >
-                        ]: (
-                          Valid<F[N]["type"], R>
-                        );
-                      };
-                    }[keyof T]
+                  keyof T extends never ? {
+                      [
+                        N in keyof MandatoryUnless<
+                          F,
+                          { optional: {} }
+                        >
+                      ]: (
+                        Valid<F[N]["type"], R>
+                      );
+                    }
+                    : T extends { [name: string]: Field } ? (
+                        & Mutex<
+                          {
+                            [
+                              N in keyof MandatoryUnless<
+                                T,
+                                { optional: {} }
+                              >
+                            ]: (
+                              Valid<T[N]["type"], R>
+                            );
+                          }
+                        >
+                        & (
+                          Exclude<keyof F, keyof T> extends never ? object
+                            : {
+                              [
+                                N in keyof MandatoryUnless<
+                                  Omit<F, keyof T>,
+                                  { optional: {} }
+                                >
+                              ]: (
+                                Valid<F[N]["type"], R>
+                              );
+                            }
+                        )
+                      )
+                    : never
                 )
                 : never
             )
