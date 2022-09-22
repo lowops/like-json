@@ -1,6 +1,5 @@
 {
   "imports": {
-    "://": "../../../../repos/",
-    "#/": "./"
+    "github.com/": "./esm/dist/scopes/github.com/"
   }
 }

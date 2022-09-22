@@ -1,6 +1,7 @@
 {
-  "importMap": "./importmap.json",
+  "importMap": "../../../../importmap.json",
   "tasks": {
+    "test": "deno test ./esm/dist/",
     "gzip": "gzip -k ./esm/text.js",
     "bundle": "npx esbuild ./esm/text.ts --bundle --minify --outfile=./esm/text.js",
     "emit": "deno bundle ./esm/text.ts -- esm/text.js"

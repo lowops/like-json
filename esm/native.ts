@@ -160,14 +160,14 @@ type FloatString<T extends number> = `${T}`;
 
 type ToObject<
   F extends { [name: string]: Field },
-  R extends Registrations | undefined,
+  R extends Registrations,
 > = {
   [N in keyof MandatoryUnless<F, { optional: {} }>]: Valid<F[N]["type"], R>;
 };
 
 type Inferred<
   S extends Schema, // | KeysFrom<R>, // ts(2589) Type instantiation is excessively deep and possibly infinite.
-  R extends Registrations | undefined,
+  R extends Registrations,
 > = [
   (
     S extends { like: infer L } ? (
@@ -330,7 +330,7 @@ type Inferred<
 
 type Valid<
   S extends Schema, // = R["_"],
-  R extends Registrations | undefined,
+  R extends Registrations,
 > = S extends Pattern ? Inferred<S, R>
   : S extends And ? (
       number & keyof S extends never ? unknown : (
@@ -349,7 +349,7 @@ type Valid<
   : never;
 
 type Lookup<
-  R extends Registrations | undefined,
+  R extends Registrations,
   N, // TODO: maybe try to extends this
 > = N extends KeysFrom<R> ? (
     R extends Registries ? FirstHaving<R, N>[N]["type"]
@@ -359,7 +359,7 @@ type Lookup<
   : never;
 
 export type Native<
-  R extends Registrations | undefined,
+  R extends Registrations,
   T extends Schema | KeysFrom<R> = "_" extends KeysFrom<R> ? "_" : never,
 > = (
   // (infer V) prevents ts(2589) Type instantiation is excessively deep and possibly infinite.

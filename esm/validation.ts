@@ -12,9 +12,8 @@ import type {
   Registrations,
   Registry,
   Schema,
-} from "./native.d.ts";
+} from "./native.js";
 
-// TODO: beg for export type * from ""; https://github.com/microsoft/TypeScript/issues/37238
 export type {
   And,
   Behavior,
@@ -28,7 +27,8 @@ export type {
   Registries,
   Registry,
   Schema,
-} from "./native.d.ts";
+} from "./native.js";
+// TODO: beg for export type * from ""; https://github.com/microsoft/TypeScript/issues/37238
 
 const isDataView = function (this: () => any, val: any): val is DataView {
   return this.call(val) === "[object DataView]";
@@ -66,21 +66,21 @@ export const likeKeyof = <K extends keyof V | undefined, V extends {}>(
 export const likeValid = maybeValid;
 
 function maybeValid<
-  R extends Registrations | undefined,
+  R extends Registrations,
   T extends Schema | KeysFrom<R>,
   V extends Native<R, T>,
->(use: R, nameOrSchema: T, value: V): V;
+>(use: R | undefined, nameOrSchema: T, value: V): V;
 
 function maybeValid<
-  R extends Registrations | undefined,
+  R extends Registrations,
   T extends Schema | KeysFrom<R>,
->(use: R, nameOrSchema: T): Native<R, T> | undefined;
+>(use: R | undefined, nameOrSchema: T): Native<R, T> | undefined;
 
 function maybeValid<
-  R extends Registrations | undefined,
+  R extends Registrations,
   T extends Schema | KeysFrom<R>,
   V extends Native<R, T>,
->(use: R, nameOrSchema: T, value?: V) {
+>(use: R | undefined, nameOrSchema: T, value?: V) {
   return value;
 }
 
@@ -108,17 +108,17 @@ export const likeDeclaration: UnaryLike<Declaration> = identity;
 
 export const asUnsafe = <
   T extends Schema | KeysFrom<R>,
-  R extends Registrations | undefined,
+  R extends Registrations,
 >(
   target: unknown,
-  nameOrSchema?: T,
-  use?: R,
+  nameOrSchema: T,
+  use: R | undefined,
 ): target is Native<R, T> => true;
 
-const resolveSchema = <
+function resolveSchema <
   T extends Schema | KeysFrom<R>,
-  R extends Registrations | undefined,
->(nameOrSchema: T, use: R): Schema | undefined => {
+  R extends Registrations,
+>(nameOrSchema: T, use: R | undefined): Schema | undefined {
   if (!isKeylike(nameOrSchema)) {
     return nameOrSchema;
   } else if (Array.isArray(use)) {
@@ -129,7 +129,8 @@ const resolveSchema = <
       }
     }
   } else if (isKeyof(use, nameOrSchema)) {
-    return use[nameOrSchema].type;
+    // TODO: figure out how to infer Registry from !Array.isArray() ...
+    return Object(use[nameOrSchema]).type;
   }
 
   return undefined;
@@ -144,10 +145,10 @@ const isAndSchema = (schema: Schema): schema is And => {
 };
 
 export const isValid = <
-  R extends Registrations | undefined,
+  R extends Registrations,
   T extends Schema | KeysFrom<R>,
 >(
-  use: R,
+  use: R | undefined,
   nameOrSchema: T,
   target: unknown,
   height = 256,
@@ -156,12 +157,12 @@ export const isValid = <
 };
 
 const notValid = <
-  R extends Registrations | undefined,
+  R extends Registrations,
   T extends Schema | KeysFrom<R>,
 >(
   target: unknown,
   nameOrSchema: T,
-  use: R,
+  use: R | undefined,
   height: number,
   saw: null | Set<unknown>,
   cache: null | Map<unknown, Set<Schema>>,
@@ -200,10 +201,10 @@ const notValid = <
   return absolutely ? reason + absolutely : "";
 };
 
-const notAndMatch = <R extends Registrations | undefined>(
+const notAndMatch = <R extends Registrations>(
   target: unknown,
   match: And,
-  use: R,
+  use: R | undefined,
   height: number,
   saw: null | Set<unknown>,
   cache: null | Map<unknown, Set<Schema>>,
@@ -226,10 +227,10 @@ const notAndMatch = <R extends Registrations | undefined>(
   return aggregate;
 };
 
-const notOrMatch = <R extends Registrations | undefined>(
+const notOrMatch = <R extends Registrations>(
   target: unknown,
   match: Or,
-  use: R,
+  use: R | undefined,
   height: number,
   saw: null | Set<unknown>,
   cache: null | Map<unknown, Set<Schema>>,
@@ -254,10 +255,10 @@ const notOrMatch = <R extends Registrations | undefined>(
   return aggregate;
 };
 
-const notDirectMatch = <R extends Registrations | undefined>(
+const notDirectMatch = <R extends Registrations>(
   target: unknown,
   match: Pattern,
-  use: R,
+  use: R | undefined,
   height: number,
   saw: null | Set<unknown>,
   cache: null | Map<unknown, Set<Schema>>,
@@ -287,7 +288,9 @@ const notDirectMatch = <R extends Registrations | undefined>(
 
     case "object": {
       if (target === null) {
-        return notNullMatch(target, match);
+        // TODO: error TS2345: Argument of type 'object' is not assignable to parameter of type 'null'.
+        // return notNullMatch(target, match);
+        return notNullMatch(null, match);
       } else if (ArrayBuffer.isView(target)) {
         return notViewMatch(target, match);
       } else if (Array.isArray(target)) {
@@ -407,10 +410,10 @@ const notViewMatch = (target: ArrayBufferView, match: Pattern): string => {
   return "Like: buffer-view is not valid.\n";
 };
 
-const notArrayMatch = <R extends Registrations | undefined>(
+const notArrayMatch = <R extends Registrations>(
   target: Array<any>,
   match: Pattern,
-  use: R,
+  use: R | undefined,
   height: number,
   saw: null | Set<unknown>,
   cache: null | Map<unknown, Set<Schema>>,
@@ -452,10 +455,10 @@ const notArrayMatch = <R extends Registrations | undefined>(
   return "";
 };
 
-const notObjectMatch = <R extends Registrations | undefined>(
+const notObjectMatch = <R extends Registrations>(
   target: object,
   match: Pattern,
-  use: R,
+  use: R | undefined,
   height: number,
   saw: null | Set<unknown>,
   cache: null | Map<unknown, Set<Schema>>,
@@ -552,10 +555,10 @@ const notObjectMatch = <R extends Registrations | undefined>(
   return "";
 };
 
-const notIndirectMatch = <R extends Registrations | undefined>(
+const notIndirectMatch = <R extends Registrations>(
   target: unknown,
   match: Pattern,
-  use: R,
+  use: R | undefined,
   height: number,
   saw: null | Set<unknown>,
   cache: null | Map<unknown, Set<Schema>>,

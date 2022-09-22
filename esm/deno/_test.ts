@@ -1,11 +1,13 @@
-import stdlib from "#/esm/like.json" assert { type: "json" };
+import stdlib from "github.com/lowops/like-json/esm/like.json" assert {
+  type: "json",
+};
 import {
   isField,
   isRegistry,
   isSchema,
   isValid,
   likeValid,
-} from "#/esm/validation.ts";
+} from "github.com/lowops/like-json/esm/validation.js";
 
 const deno = globalThis["Deno"];
 
@@ -54,13 +56,13 @@ deno.test("like-json validation: reject circular references", async () => {
               "_": "Maybe loop.",
               "null": {},
               "like": {
-                "valid": { "Recursive": {} }
-              }
-            }
-          }
-        }
-      }
-    }
+                "valid": { "Recursive": {} },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   const value = new Array();
